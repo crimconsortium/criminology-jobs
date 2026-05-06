@@ -371,9 +371,6 @@
     if (job.display_country) locParts.push(job.display_country);
     var locStr = locParts.join(" · ");
 
-    var deadlineDays = daysUntil(job.deadline_or_review_date);
-    var deadlinePretty = prettyDate(job.deadline_or_review_date) || job.deadline_or_review_date || "";
-
     var tags = [];
     if (job.rank_type) tags.push('<span class="tag tag-rank">' + escapeHtml(bucketRank(job.rank_type)) + "</span>");
 
@@ -383,15 +380,6 @@
         ' <span class="consortium-badge" title="' + escapeHtml(job.consortium_member) + ' is a CrimRxiv Consortium member">' +
         "CrimRxiv" +
         "</span>";
-    }
-
-    var deadlineHtml = "";
-    if (deadlinePretty) {
-      // Highlight upcoming deadlines (within 14 days), but don't print a
-      // live day-count — the page can be viewed any day after data was
-      // compiled, so a relative count would drift out of sync.
-      var soonClass = (deadlineDays !== null && deadlineDays >= 0 && deadlineDays <= 14) ? " tag-deadline-soon" : "";
-      deadlineHtml = '<span class="tag' + soonClass + '">⏰ ' + escapeHtml(deadlinePretty) + "</span>";
     }
 
     var card = el("button", {
@@ -411,7 +399,7 @@
       (locStr ? '<div class="job-card-meta"><span class="job-card-meta-item">' +
         "<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z'/><circle cx='12' cy='10' r='3'/></svg>" +
         escapeHtml(locStr) + "</span></div>" : "") +
-      '<div class="job-card-tags">' + tags.join("") + deadlineHtml + "</div>";
+      '<div class="job-card-tags">' + tags.join("") + "</div>";
 
     card.addEventListener("click", function () { openModal(job); });
     return card;
