@@ -6,6 +6,52 @@
   // ============================================================
   var DATA = window.JOBS_DATA || { jobs: [], compiled: "" };
   var JOBS = (DATA.jobs || []).slice();
+
+  // ----- UK constituent-country lookup ------------------------------
+  // The source data only stores `country: "United Kingdom"`. We split it
+  // into the four constituent countries based on the city/region string.
+  // Anything not matched falls back to England (statistically dominant
+  // and matches the current snapshot).
+  var UK_CITY_TO_REGION = (function () {
+    var map = {};
+    var add = function (region, cities) {
+      cities.forEach(function (c) { map[c.toLowerCase()] = region; });
+    };
+    add("Scotland", [
+      "Edinburgh", "Glasgow", "Aberdeen", "Dundee", "St Andrews", "Stirling",
+      "Inverness", "Paisley", "Perth", "Ayr", "Falkirk", "Dumfries"
+    ]);
+    add("Wales", [
+      "Cardiff", "Swansea", "Bangor", "Aberystwyth", "Newport", "Wrexham",
+      "Pontypridd", "Carmarthen", "Lampeter"
+    ]);
+    add("Northern Ireland", [
+      "Belfast", "Derry", "Londonderry", "Coleraine", "Jordanstown", "Armagh"
+    ]);
+    return map;
+  })();
+  function ukRegionFromCity(city) {
+    if (!city) return "England";
+    var key = String(city).trim().toLowerCase();
+    if (UK_CITY_TO_REGION[key]) return UK_CITY_TO_REGION[key];
+    // Try last token (handles "Edinburgh, Scotland" or "Greater Glasgow")
+    var parts = key.split(/[,/]/).map(function (s) { return s.trim(); });
+    for (var i = 0; i < parts.length; i++) {
+      if (UK_CITY_TO_REGION[parts[i]]) return UK_CITY_TO_REGION[parts[i]];
+    }
+    return "England";
+  }
+
+  // Annotate every job with a `display_country` we use everywhere the
+  // user sees or filters by country. Underlying `country` field is left
+  // untouched in case downstream consumers need it.
+  JOBS.forEach(function (j) {
+    if (j.country === "United Kingdom") {
+      j.display_country = ukRegionFromCity(j.city_or_region);
+    } else {
+      j.display_country = j.country || "";
+    }
+  });
   // Use the actual current date so deadline labels ("closed", "5 days", etc.) stay correct
   // as the page is viewed over time.
   var TODAY = (function () {
@@ -112,6 +158,7 @@
       job.area_specialization,
       job.city_or_region,
       job.country,
+      job.display_country,
       job.rank_type,
     ].join(" ").toLowerCase();
     return hay.indexOf(q) >= 0;
@@ -119,7 +166,7 @@
   function applyFilters() {
     return JOBS.filter(function (j) {
       if (state.consortiumOnly && !isConsortium(j)) return false;
-      if (state.country && j.country !== state.country) return false;
+      if (state.country && j.display_country !== state.country) return false;
       if (state.ranks.size > 0 && !state.ranks.has(bucketRank(j.rank_type))) return false;
       if (!jobMatchesSearch(j)) return false;
       return true;
@@ -214,7 +261,7 @@
   function renderStats(filtered) {
     $("#stat-total").textContent = JOBS.length;
     var countries = {};
-    JOBS.forEach(function (j) { if (j.country) countries[j.country] = true; });
+    JOBS.forEach(function (j) { if (j.display_country) countries[j.display_country] = true; });
     $("#stat-countries").textContent = Object.keys(countries).length;
     $("#stat-filtered").textContent = filtered.length;
     var compiledEl = $("#stat-compiled");
@@ -225,7 +272,7 @@
   // Render: country list
   // ============================================================
   function renderCountries() {
-    var counts = countBy(JOBS, "country");
+    var counts = countBy(JOBS, "display_country");
     var entries = Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; });
     var list = $("#country-list");
     list.innerHTML = "";
@@ -321,7 +368,7 @@
   function jobCard(job) {
     var locParts = [];
     if (job.city_or_region) locParts.push(job.city_or_region);
-    if (job.country) locParts.push(job.country);
+    if (job.display_country) locParts.push(job.display_country);
     var locStr = locParts.join(" · ");
 
     var deadlineDays = daysUntil(job.deadline_or_review_date);
@@ -400,7 +447,7 @@
     var urls = (job.combined_urls || job.job_url || "").split(",").map(function (u) { return u.trim(); }).filter(Boolean);
     var locParts = [];
     if (job.city_or_region) locParts.push(job.city_or_region);
-    if (job.country) locParts.push(job.country);
+    if (job.display_country) locParts.push(job.display_country);
 
     $("#modal-eyebrow").innerHTML = sources.map(function (s) {
       return '<span class="source-badge ' + sourceClass(s) + '">' + escapeHtml(s) + "</span>";
