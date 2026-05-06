@@ -84,13 +84,20 @@
       <div class="workspace">
         <aside class="sidebar">
           <div class="panel">
-            <div class="panel-title">Country</div>
-            <div class="panel-hint">Click to scope results to one country.</div>
-            <div class="dept-list" id="country-list"></div>
-          </div>
-
-          <div class="panel">
             <div class="panel-title">Filters</div>
+
+            <div class="filter-group">
+              <label class="filter-label">Affiliation</label>
+              <label class="toggle-row">
+                <input type="checkbox" id="consortium-toggle" />
+                <span class="toggle-row-label">Only show <a href="https://crimrxiv.com/consortium" target="_blank" rel="noopener">CrimRxiv Consortium</a> jobs</span>
+              </label>
+            </div>
+
+            <div class="filter-group">
+              <label class="filter-label">Country</label>
+              <div class="dept-list" id="country-list"></div>
+            </div>
 
             <div class="filter-group">
               <label class="filter-label">Rank / role type</label>

@@ -6,7 +6,12 @@
   // ============================================================
   var DATA = window.JOBS_DATA || { jobs: [], compiled: "" };
   var JOBS = (DATA.jobs || []).slice();
-  var TODAY = new Date("2026-04-26");
+  // Use the actual current date so deadline labels ("closed", "5 days", etc.) stay correct
+  // as the page is viewed over time.
+  var TODAY = (function () {
+    var d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  })();
 
   var state = {
     search: "",
@@ -301,6 +306,11 @@
       bar.appendChild(chip);
     }
     if (state.search) addChip('Search: "' + state.search + '"', function () { state.search = ""; $("#search-input").value = ""; render(); });
+    if (state.consortiumOnly) addChip("CrimRxiv Consortium only", function () {
+      state.consortiumOnly = false;
+      var t = $("#consortium-toggle"); if (t) t.checked = false;
+      render();
+    });
     if (state.country) addChip("Country: " + state.country, function () { state.country = null; render(); });
     state.ranks.forEach(function (v) { addChip("Rank: " + v, function () { state.ranks.delete(v); render(); }); });
   }
@@ -319,7 +329,6 @@
 
     var tags = [];
     if (job.rank_type) tags.push('<span class="tag tag-rank">' + escapeHtml(bucketRank(job.rank_type)) + "</span>");
-    if (job.contract_type) tags.push('<span class="tag">' + escapeHtml(job.contract_type) + "</span>");
 
     var consortiumBadge = "";
     if (isConsortium(job)) {
@@ -431,7 +440,6 @@
       row("Consortium", consortiumValue, true) +
       row("Location", locParts.join(", ")) +
       row("Rank / role", job.rank_type) +
-      row("Contract", job.contract_type) +
       row("Specialization", job.area_specialization) +
       row("Posted", prettyDate(job.posted_date)) +
       row("Deadline", deadlineDisplay) +
@@ -540,10 +548,20 @@
       state.country = null;
       state.ranks.clear();
       state.consortiumOnly = false;
+      var ct = $("#consortium-toggle"); if (ct) ct.checked = false;
       $("#search-input").value = "";
       $("#search-clear").classList.remove("visible");
       render();
     });
+
+    // Consortium-only toggle
+    var consortiumToggle = $("#consortium-toggle");
+    if (consortiumToggle) {
+      consortiumToggle.addEventListener("change", function (e) {
+        state.consortiumOnly = e.target.checked;
+        render();
+      });
+    }
 
     // Coverage toggle
     var covToggle = $("#coverage-toggle");
