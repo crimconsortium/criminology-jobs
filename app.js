@@ -217,8 +217,8 @@
     JOBS.forEach(function (j) { if (j.country) countries[j.country] = true; });
     $("#stat-countries").textContent = Object.keys(countries).length;
     $("#stat-filtered").textContent = filtered.length;
-    var consortiumCount = JOBS.filter(isConsortium).length;
-    $("#stat-consortium").textContent = consortiumCount;
+    var compiledEl = $("#stat-compiled");
+    if (compiledEl) compiledEl.textContent = DATA.compiled || "—";
   }
 
   // ============================================================
