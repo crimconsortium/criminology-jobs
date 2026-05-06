@@ -340,15 +340,11 @@
 
     var deadlineHtml = "";
     if (deadlinePretty) {
+      // Highlight upcoming deadlines (within 14 days), but don't print a
+      // live day-count — the page can be viewed any day after data was
+      // compiled, so a relative count would drift out of sync.
       var soonClass = (deadlineDays !== null && deadlineDays >= 0 && deadlineDays <= 14) ? " tag-deadline-soon" : "";
-      var soonLabel = "";
-      if (deadlineDays !== null) {
-        if (deadlineDays < 0) soonLabel = " (closed)";
-        else if (deadlineDays === 0) soonLabel = " (today)";
-        else if (deadlineDays === 1) soonLabel = " (1 day)";
-        else if (deadlineDays <= 14) soonLabel = " (" + deadlineDays + " days)";
-      }
-      deadlineHtml = '<span class="tag' + soonClass + '">⏰ ' + escapeHtml(deadlinePretty) + soonLabel + "</span>";
+      deadlineHtml = '<span class="tag' + soonClass + '">⏰ ' + escapeHtml(deadlinePretty) + "</span>";
     }
 
     var card = el("button", {
@@ -421,13 +417,7 @@
       return dt + dd;
     }
 
-    var deadlineDays = daysUntil(job.deadline_or_review_date);
     var deadlineDisplay = prettyDate(job.deadline_or_review_date) || job.deadline_or_review_date || "";
-    if (deadlineDisplay && deadlineDays !== null) {
-      if (deadlineDays < 0) deadlineDisplay += " (closed " + Math.abs(deadlineDays) + " days ago)";
-      else if (deadlineDays === 0) deadlineDisplay += " (today)";
-      else if (deadlineDays <= 14) deadlineDisplay += " (in " + deadlineDays + " day" + (deadlineDays === 1 ? "" : "s") + ")";
-    }
 
     var salary = job.salary_range || "";
     if (salary && job.salary_currency) salary = job.salary_currency + " · " + salary;
