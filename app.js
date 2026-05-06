@@ -1,0 +1,588 @@
+(function () {
+  "use strict";
+
+  // ============================================================
+  // Data + state
+  // ============================================================
+  var DATA = window.JOBS_DATA || { jobs: [], compiled: "" };
+  var JOBS = (DATA.jobs || []).slice();
+  var TODAY = new Date("2026-04-26");
+
+  var state = {
+    search: "",
+    country: null, // single-select
+    sources: new Set(),
+    ranks: new Set(),
+    contracts: new Set(),
+    sort: "posted_desc",
+    consortiumOnly: false,
+  };
+
+  function isConsortium(job) { return !!(job && job.consortium_member); }
+
+  // ============================================================
+  // Date helpers
+  // ============================================================
+  var MONTHS = {
+    jan: 0, january: 0, feb: 1, february: 1, mar: 2, march: 2, apr: 3, april: 3,
+    may: 4, jun: 5, june: 5, jul: 6, july: 6, aug: 7, august: 7,
+    sep: 8, sept: 8, september: 8, oct: 9, october: 9, nov: 10, november: 10,
+    dec: 11, december: 11,
+  };
+  function parseDate(s) {
+    if (!s) return null;
+    s = String(s).trim();
+    // ISO 2026-04-21
+    var iso = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (iso) return new Date(+iso[1], +iso[2] - 1, +iso[3]);
+    // "April 27, 2026"
+    var long = s.match(/^([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})$/);
+    if (long && MONTHS[long[1].toLowerCase()] !== undefined) {
+      return new Date(+long[3], MONTHS[long[1].toLowerCase()], +long[2]);
+    }
+    // "21 Apr 2026"
+    var euro = s.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/);
+    if (euro && MONTHS[euro[2].toLowerCase()] !== undefined) {
+      return new Date(+euro[3], MONTHS[euro[2].toLowerCase()], +euro[1]);
+    }
+    return null;
+  }
+  function fmtDate(d) {
+    if (!d) return "";
+    var months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    return months[d.getMonth()] + " " + d.getDate() + ", " + d.getFullYear();
+  }
+  function prettyDate(s) {
+    var d = parseDate(s);
+    return d ? fmtDate(d) : (s || "");
+  }
+  function daysUntil(s) {
+    var d = parseDate(s);
+    if (!d) return null;
+    return Math.floor((d - TODAY) / 86400000);
+  }
+
+  // ============================================================
+  // Counters for facets
+  // ============================================================
+  function countBy(jobs, key) {
+    var m = {};
+    jobs.forEach(function (j) {
+      var v = (j[key] || "").trim();
+      if (!v) return;
+      // Some rows have comma-separated source_site values; split for source counts
+      if (key === "source_site" && v.indexOf(",") >= 0) {
+        v.split(",").map(function (s) { return s.trim(); }).forEach(function (s) {
+          m[s] = (m[s] || 0) + 1;
+        });
+      } else {
+        m[v] = (m[v] || 0) + 1;
+      }
+    });
+    return m;
+  }
+
+  // ============================================================
+  // Filtering + sorting
+  // ============================================================
+  function jobMatchesSources(job) {
+    if (state.sources.size === 0) return true;
+    var sources = (job.source_site || "").split(",").map(function (s) { return s.trim(); });
+    for (var i = 0; i < sources.length; i++) {
+      if (state.sources.has(sources[i])) return true;
+    }
+    return false;
+  }
+  function jobMatchesSearch(job) {
+    if (!state.search) return true;
+    var q = state.search.toLowerCase();
+    var hay = [
+      job.job_title,
+      job.institution,
+      job.department_or_school,
+      job.area_specialization,
+      job.city_or_region,
+      job.country,
+      job.rank_type,
+    ].join(" ").toLowerCase();
+    return hay.indexOf(q) >= 0;
+  }
+  function applyFilters() {
+    return JOBS.filter(function (j) {
+      if (state.consortiumOnly && !isConsortium(j)) return false;
+      if (state.country && j.country !== state.country) return false;
+      if (!jobMatchesSources(j)) return false;
+      if (state.ranks.size > 0 && !state.ranks.has(j.rank_type)) return false;
+      if (state.contracts.size > 0 && !state.contracts.has(j.contract_type)) return false;
+      if (!jobMatchesSearch(j)) return false;
+      return true;
+    });
+  }
+  function applySort(jobs) {
+    var s = state.sort;
+    var sorted = jobs.slice();
+    // Always pin consortium-member jobs to the top within the chosen sort,
+    // unless the user is already filtering only-consortium (no need then).
+    function consortiumPriority(a, b) {
+      if (state.consortiumOnly) return 0;
+      var ca = isConsortium(a) ? 0 : 1;
+      var cb = isConsortium(b) ? 0 : 1;
+      return ca - cb;
+    }
+    if (s === "posted_desc" || s === "posted_asc") {
+      sorted.sort(function (a, b) {
+        var p = consortiumPriority(a, b); if (p !== 0) return p;
+        var da = parseDate(a.posted_date);
+        var db = parseDate(b.posted_date);
+        if (!da && !db) return 0;
+        if (!da) return 1;
+        if (!db) return -1;
+        return s === "posted_desc" ? db - da : da - db;
+      });
+    } else if (s === "deadline_asc") {
+      sorted.sort(function (a, b) {
+        var p = consortiumPriority(a, b); if (p !== 0) return p;
+        var da = parseDate(a.deadline_or_review_date);
+        var db = parseDate(b.deadline_or_review_date);
+        if (!da && !db) return 0;
+        if (!da) return 1; // missing deadline last
+        if (!db) return -1;
+        return da - db;
+      });
+    } else if (s === "institution") {
+      sorted.sort(function (a, b) {
+        var p = consortiumPriority(a, b); if (p !== 0) return p;
+        return (a.institution || "").localeCompare(b.institution || "");
+      });
+    } else if (s === "title") {
+      sorted.sort(function (a, b) {
+        var p = consortiumPriority(a, b); if (p !== 0) return p;
+        return (a.job_title || "").localeCompare(b.job_title || "");
+      });
+    }
+    return sorted;
+  }
+
+  // ============================================================
+  // DOM helpers
+  // ============================================================
+  function $(sel, root) { return (root || document).querySelector(sel); }
+  function $$(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
+  function el(tag, attrs, children) {
+    var n = document.createElement(tag);
+    if (attrs) {
+      Object.keys(attrs).forEach(function (k) {
+        if (k === "class") n.className = attrs[k];
+        else if (k === "html") n.innerHTML = attrs[k];
+        else if (k === "text") n.textContent = attrs[k];
+        else if (k.indexOf("on") === 0) n.addEventListener(k.slice(2), attrs[k]);
+        else if (attrs[k] !== null && attrs[k] !== undefined) n.setAttribute(k, attrs[k]);
+      });
+    }
+    (children || []).forEach(function (c) {
+      if (c == null) return;
+      n.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
+    });
+    return n;
+  }
+  function escapeHtml(s) {
+    if (s == null) return "";
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function sourceClass(s) {
+    if (!s) return "";
+    var t = s.toLowerCase();
+    if (t.indexOf("higheredjobs") >= 0) return "higheredjobs";
+    if (t.indexOf("asc") >= 0 && t.indexOf("acjs") < 0) return "asc";
+    if (t.indexOf("acjs") >= 0 && t.indexOf("asc") < 0) return "acjs";
+    if (t.indexOf("jobs.ac.uk") >= 0) return "jobs-ac-uk";
+    return "";
+  }
+
+  // ============================================================
+  // Render: stats
+  // ============================================================
+  function renderStats(filtered) {
+    $("#stat-total").textContent = JOBS.length;
+    var countries = {};
+    JOBS.forEach(function (j) { if (j.country) countries[j.country] = true; });
+    $("#stat-countries").textContent = Object.keys(countries).length;
+    $("#stat-filtered").textContent = filtered.length;
+    var consortiumCount = JOBS.filter(isConsortium).length;
+    $("#stat-consortium").textContent = consortiumCount;
+    var summary = $("#consortium-summary");
+    if (summary) {
+      if (consortiumCount === 0) {
+        summary.textContent = "No consortium-member postings in the current snapshot.";
+      } else {
+        summary.textContent = consortiumCount + " of " + JOBS.length + " postings are from consortium-member institutions.";
+      }
+    }
+  }
+
+  // ============================================================
+  // Render: country list
+  // ============================================================
+  function renderCountries() {
+    var counts = countBy(JOBS, "country");
+    var entries = Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; });
+    var list = $("#country-list");
+    list.innerHTML = "";
+    var allItem = el("div", {
+      class: "dept-item" + (state.country == null ? " active" : ""),
+      onclick: function () { state.country = null; render(); },
+    }, [
+      el("span", { text: "All countries" }),
+      el("span", { class: "dept-count", text: String(JOBS.length) }),
+    ]);
+    list.appendChild(allItem);
+    entries.forEach(function (c) {
+      var item = el("div", {
+        class: "dept-item" + (state.country === c ? " active" : ""),
+        onclick: function () { state.country = (state.country === c) ? null : c; render(); },
+      }, [
+        el("span", { text: c }),
+        el("span", { class: "dept-count", text: String(counts[c]) }),
+      ]);
+      list.appendChild(item);
+    });
+  }
+
+  // ============================================================
+  // Render: checkbox filter groups
+  // ============================================================
+  function renderCheckboxGroup(containerId, key, valueSet, sortByCount) {
+    var counts = countBy(JOBS, key);
+    var entries = Object.keys(counts);
+    if (sortByCount) {
+      entries.sort(function (a, b) {
+        var diff = counts[b] - counts[a];
+        return diff !== 0 ? diff : a.localeCompare(b);
+      });
+    } else {
+      entries.sort(function (a, b) { return a.localeCompare(b); });
+    }
+    var container = $("#" + containerId);
+    container.innerHTML = "";
+    entries.forEach(function (v) {
+      var checked = valueSet.has(v);
+      var label = el("label", { class: "checkbox-item" }, []);
+      var cb = el("input", { type: "checkbox" });
+      cb.checked = checked;
+      cb.addEventListener("change", function () {
+        if (cb.checked) valueSet.add(v); else valueSet.delete(v);
+        render();
+      });
+      label.appendChild(cb);
+      label.appendChild(el("span", { class: "checkbox-item-label", text: v }));
+      label.appendChild(el("span", { class: "checkbox-item-count", text: String(counts[v]) }));
+      container.appendChild(label);
+    });
+  }
+
+  // ============================================================
+  // Render: active filter chips
+  // ============================================================
+  function renderActiveFilters() {
+    var bar = $("#active-filters");
+    bar.innerHTML = "";
+    function addChip(label, onClear) {
+      var chip = el("span", { class: "active-chip" }, [
+        document.createTextNode(label),
+        el("button", {
+          "aria-label": "Remove " + label,
+          onclick: onClear,
+          html: "<svg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><line x1='18' y1='6' x2='6' y2='18'/><line x1='6' y1='6' x2='18' y2='18'/></svg>",
+        }),
+      ]);
+      bar.appendChild(chip);
+    }
+    if (state.search) addChip('Search: "' + state.search + '"', function () { state.search = ""; $("#search-input").value = ""; render(); });
+    if (state.consortiumOnly) addChip("CrimRxiv Consortium only", function () { state.consortiumOnly = false; $("#consortium-toggle").checked = false; render(); });
+    if (state.country) addChip("Country: " + state.country, function () { state.country = null; render(); });
+    state.sources.forEach(function (v) { addChip("Source: " + v, function () { state.sources.delete(v); render(); }); });
+    state.ranks.forEach(function (v) { addChip("Rank: " + v, function () { state.ranks.delete(v); render(); }); });
+    state.contracts.forEach(function (v) { addChip("Contract: " + v, function () { state.contracts.delete(v); render(); }); });
+  }
+
+  // ============================================================
+  // Render: cards
+  // ============================================================
+  function jobCard(job) {
+    var sources = (job.source_site || "").split(",").map(function (s) { return s.trim(); });
+    var sourceBadges = sources.map(function (s) {
+      return '<span class="source-badge ' + sourceClass(s) + '">' + escapeHtml(s) + '</span>';
+    }).join(" ");
+
+    var locParts = [];
+    if (job.city_or_region) locParts.push(job.city_or_region);
+    if (job.country) locParts.push(job.country);
+    var locStr = locParts.join(" · ");
+
+    var deadlineDays = daysUntil(job.deadline_or_review_date);
+    var deadlinePretty = prettyDate(job.deadline_or_review_date) || job.deadline_or_review_date || "";
+
+    var tags = [];
+    if (job.rank_type) tags.push('<span class="tag tag-rank">' + escapeHtml(job.rank_type) + "</span>");
+    if (job.contract_type) tags.push('<span class="tag">' + escapeHtml(job.contract_type) + "</span>");
+
+    var consortiumBadge = "";
+    if (isConsortium(job)) {
+      consortiumBadge =
+        ' <span class="consortium-badge" title="' + escapeHtml(job.consortium_member) + ' is a CrimRxiv Consortium member">' +
+        "CrimRxiv" +
+        "</span>";
+    }
+
+    var deadlineHtml = "";
+    if (deadlinePretty) {
+      var soonClass = (deadlineDays !== null && deadlineDays >= 0 && deadlineDays <= 14) ? " tag-deadline-soon" : "";
+      var soonLabel = "";
+      if (deadlineDays !== null) {
+        if (deadlineDays < 0) soonLabel = " (closed)";
+        else if (deadlineDays === 0) soonLabel = " (today)";
+        else if (deadlineDays === 1) soonLabel = " (1 day)";
+        else if (deadlineDays <= 14) soonLabel = " (" + deadlineDays + " days)";
+      }
+      deadlineHtml = '<span class="tag' + soonClass + '">⏰ ' + escapeHtml(deadlinePretty) + soonLabel + "</span>";
+    }
+
+    var card = el("button", {
+      class: "job-card" + (isConsortium(job) ? " is-consortium" : ""),
+      type: "button",
+      "data-id": job.id,
+    });
+    card.innerHTML =
+      '<div class="job-card-eyebrow">' + sourceBadges + consortiumBadge +
+      (job.posted_date ? ' <span>posted ' + escapeHtml(prettyDate(job.posted_date)) + "</span>" : "") +
+      "</div>" +
+      '<div class="job-card-title">' + escapeHtml(job.job_title || "—") + "</div>" +
+      '<div class="job-card-inst">' + escapeHtml(job.institution || "") + "</div>" +
+      (locStr ? '<div class="job-card-meta"><span class="job-card-meta-item">' +
+        "<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z'/><circle cx='12' cy='10' r='3'/></svg>" +
+        escapeHtml(locStr) + "</span></div>" : "") +
+      '<div class="job-card-tags">' + tags.join("") + deadlineHtml + "</div>";
+
+    card.addEventListener("click", function () { openModal(job); });
+    return card;
+  }
+
+  function renderResults() {
+    var filtered = applyFilters();
+    var sorted = applySort(filtered);
+
+    renderStats(filtered);
+
+    $("#results-title").textContent = state.country ? state.country : "All postings";
+    $("#results-meta").textContent = sorted.length + " posting" + (sorted.length === 1 ? "" : "s");
+
+    var grid = $("#job-grid");
+    var empty = $("#empty-state");
+    grid.innerHTML = "";
+    if (sorted.length === 0) {
+      empty.style.display = "block";
+    } else {
+      empty.style.display = "none";
+      var frag = document.createDocumentFragment();
+      sorted.forEach(function (j) { frag.appendChild(jobCard(j)); });
+      grid.appendChild(frag);
+    }
+  }
+
+  // ============================================================
+  // Modal
+  // ============================================================
+  function openModal(job) {
+    var sources = (job.source_site || "").split(",").map(function (s) { return s.trim(); });
+    var urls = (job.combined_urls || job.job_url || "").split(",").map(function (u) { return u.trim(); }).filter(Boolean);
+    var locParts = [];
+    if (job.city_or_region) locParts.push(job.city_or_region);
+    if (job.country) locParts.push(job.country);
+
+    $("#modal-eyebrow").innerHTML = sources.map(function (s) {
+      return '<span class="source-badge ' + sourceClass(s) + '">' + escapeHtml(s) + "</span>";
+    }).join(" ");
+    $("#modal-name").textContent = job.job_title || "—";
+    $("#modal-title").textContent = [job.institution, job.department_or_school].filter(Boolean).join(" · ");
+
+    function row(label, value, isHtml) {
+      var dt = '<dt>' + escapeHtml(label) + '</dt>';
+      var dd;
+      if (!value) dd = '<dd class="empty">—</dd>';
+      else if (isHtml) dd = '<dd>' + value + '</dd>';
+      else dd = '<dd>' + escapeHtml(value) + '</dd>';
+      return dt + dd;
+    }
+
+    var deadlineDays = daysUntil(job.deadline_or_review_date);
+    var deadlineDisplay = prettyDate(job.deadline_or_review_date) || job.deadline_or_review_date || "";
+    if (deadlineDisplay && deadlineDays !== null) {
+      if (deadlineDays < 0) deadlineDisplay += " (closed " + Math.abs(deadlineDays) + " days ago)";
+      else if (deadlineDays === 0) deadlineDisplay += " (today)";
+      else if (deadlineDays <= 14) deadlineDisplay += " (in " + deadlineDays + " day" + (deadlineDays === 1 ? "" : "s") + ")";
+    }
+
+    var salary = job.salary_range || "";
+    if (salary && job.salary_currency) salary = job.salary_currency + " · " + salary;
+
+    var consortiumValue = job.consortium_member
+      ? '<a href="https://crimrxiv.com/consortium" target="_blank" rel="noopener">' + escapeHtml(job.consortium_member) + ' — CrimRxiv Consortium member</a>'
+      : null;
+
+    var fields =
+      row("Consortium", consortiumValue, true) +
+      row("Location", locParts.join(", ")) +
+      row("Rank / role", job.rank_type) +
+      row("Contract", job.contract_type) +
+      row("Specialization", job.area_specialization) +
+      row("Posted", prettyDate(job.posted_date)) +
+      row("Deadline", deadlineDisplay) +
+      row("Salary", salary) +
+      row("Department", job.department_or_school);
+
+    $("#modal-body").innerHTML = '<dl class="modal-fields">' + fields + "</dl>";
+
+    var actions = $("#modal-actions");
+    actions.innerHTML = "";
+    urls.forEach(function (u, i) {
+      var label = urls.length === 1 ? "View posting" : "View posting " + (i + 1);
+      var a = el("a", {
+        href: u, target: "_blank", rel: "noopener",
+        class: i === 0 ? "btn-primary" : "btn-secondary",
+      });
+      a.innerHTML = escapeHtml(label) +
+        " <svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6'/><polyline points='15 3 21 3 21 9'/><line x1='10' y1='14' x2='21' y2='3'/></svg>";
+      actions.appendChild(a);
+    });
+
+    $("#modal").classList.add("open");
+    document.body.style.overflow = "hidden";
+  }
+  function closeModal() {
+    $("#modal").classList.remove("open");
+    document.body.style.overflow = "";
+  }
+
+  // ============================================================
+  // Theme toggle
+  // ============================================================
+  var SUN_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="4.22" y1="4.22" x2="6.34" y2="6.34"/><line x1="17.66" y1="17.66" x2="19.78" y2="19.78"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/><line x1="4.22" y1="19.78" x2="6.34" y2="17.66"/><line x1="17.66" y1="6.34" x2="19.78" y2="4.22"/></svg>';
+  var MOON_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+  function applyTheme(t) {
+    document.documentElement.setAttribute("data-theme", t);
+    $("[data-theme-toggle]").innerHTML = t === "dark" ? SUN_ICON : MOON_ICON;
+    try { localStorage.setItem("crim-jobs-theme", t); } catch (e) {}
+  }
+  function initTheme() {
+    var saved = null;
+    try { saved = localStorage.getItem("crim-jobs-theme"); } catch (e) {}
+    var t = saved || (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    applyTheme(t);
+    $("[data-theme-toggle]").addEventListener("click", function () {
+      var cur = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+      applyTheme(cur === "dark" ? "light" : "dark");
+    });
+  }
+
+  // ============================================================
+  // Coverage
+  // ============================================================
+  function renderCoverage() {
+    var html =
+      '<ul>' +
+      '<li><strong>ASC (asc41.org)</strong> — single static page, no pagination. All 6 publicly listed postings captured. Two had deadlines that may have just lapsed (UNC Charlotte April 7; Illinois April 27) but were still listed at capture time.</li>' +
+      '<li><strong>ACJS (careers.acjs.org)</strong> — both public pages of the careers board collected (39 listings total). 19 retained as criminology / criminal-justice relevant; 20 excluded as generic law-firm paralegal/clerk roles, EMTs, unrelated political organizers, and tech-company community-coordinator postings. Posted dates were given as relative ("X days ago") and converted to absolute dates relative to April 26, 2026.</li>' +
+      '<li><strong>jobs.ac.uk</strong> — the keyword=criminology search returned 15 results on a single page; 7 retained as clearly criminology-relevant (including criminology-adjacent sociology and law/social-justice posts where criminology is an explicit qualifying field). 8 excluded as pure law-school lectureships, generic LSE methodology fellowships, or unrelated technician/editor roles.</li>' +
+      '<li><strong>HigherEdJobs (higheredjobs.com)</strong> — Criminal Justice & Criminology faculty category, first 100 active postings captured (May 6, 2026). 25 retained as faculty + research roles (assistant/associate/full professors, lecturers, research professors, clinical faculty, department chairs); 75 excluded as adjunct, part-time, instructor pools, dual-credit, police-academy training, or non-criminology forensic-science/homeland-security postings. Two University of Idaho clinical-faculty posts cross-listed with ASC are merged into single rows.</li>' +
+      '<li><strong>Detail-page enrichment</strong> — teaching and research expectations are typically only described inside the linked PDFs / detail pages, so those columns are blank for almost every row. A second pass that visits each ad would be required to populate them.</li>' +
+      '<li><strong>De-duplication</strong> — records are matched across sources by normalized institution + normalized title; matches are merged into a single row with a comma-separated source_site (e.g. "ASC, HigherEdJobs") and all source URLs concatenated in combined_urls. The current snapshot has 2 cross-site duplicates: both University of Idaho clinical-faculty postings (PEI and non-PEI) appear on ASC and HigherEdJobs.</li>' +
+      "</ul>";
+    $("#coverage-items").innerHTML = html;
+  }
+
+  // ============================================================
+  // Wire-up
+  // ============================================================
+  function render() {
+    renderCountries();
+    renderCheckboxGroup("source-filter", "source_site", state.sources, true);
+    renderCheckboxGroup("rank-filter", "rank_type", state.ranks, true);
+    renderCheckboxGroup("contract-filter", "contract_type", state.contracts, true);
+    renderActiveFilters();
+    renderResults();
+  }
+
+  function init() {
+    initTheme();
+    renderCoverage();
+
+    // Search
+    var searchInput = $("#search-input");
+    var searchClear = $("#search-clear");
+    searchInput.addEventListener("input", function () {
+      state.search = searchInput.value.trim();
+      searchClear.classList.toggle("visible", state.search.length > 0);
+      render();
+    });
+    searchClear.addEventListener("click", function () {
+      searchInput.value = "";
+      state.search = "";
+      searchClear.classList.remove("visible");
+      searchInput.focus();
+      render();
+    });
+
+    // Sort
+    $("#sort-select").addEventListener("change", function (e) {
+      state.sort = e.target.value;
+      renderResults();
+    });
+
+    // Clear all
+    $("#clear-filters").addEventListener("click", function () {
+      state.search = "";
+      state.country = null;
+      state.sources.clear();
+      state.ranks.clear();
+      state.contracts.clear();
+      state.consortiumOnly = false;
+      $("#consortium-toggle").checked = false;
+      $("#search-input").value = "";
+      $("#search-clear").classList.remove("visible");
+      render();
+    });
+
+    // Consortium toggle
+    $("#consortium-toggle").addEventListener("change", function (e) {
+      state.consortiumOnly = e.target.checked;
+      render();
+    });
+
+    // Coverage toggle
+    var covToggle = $("#coverage-toggle");
+    covToggle.addEventListener("click", function () {
+      var open = covToggle.classList.toggle("open");
+      $("#coverage-items").classList.toggle("open", open);
+      $("#coverage-toggle-label").textContent = open ? "Hide coverage details" : "Show coverage details";
+    });
+
+    // Modal
+    $("#modal-close").addEventListener("click", closeModal);
+    $("#modal").addEventListener("click", function (e) {
+      if (e.target.id === "modal") closeModal();
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") closeModal();
+    });
+
+    render();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+})();

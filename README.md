@@ -1,0 +1,40 @@
+# Criminology Jobs Explorer
+
+A searchable dashboard of current academic and practitioner job postings in criminology, criminal justice, and closely related fields.
+
+**Live site:** https://crimconsortium.github.io/criminology-jobs *(once Pages is enabled)*
+
+## Sources
+
+Postings are aggregated from publicly visible listings only — anything behind a login is excluded.
+
+- [American Society of Criminology — Career Center](https://asc41.org/career-center/position-postings/)
+- [Academy of Criminal Justice Sciences — Careers](https://careers.acjs.org/jobs/)
+- [jobs.ac.uk — criminology search](https://www.jobs.ac.uk/search/?keywords=criminology)
+- [HigherEdJobs — Criminal Justice & Criminology faculty](https://www.higheredjobs.com/faculty/search.cfm?JobCat=156)
+
+## Coverage
+
+- **Roles:** faculty + research positions (tenure-track, postdocs, lecturers, professors). Adjunct, part-time pool, community-college, and pure forensic-science / homeland-security listings are filtered out.
+- **Topics:** clearly criminology / criminal-justice work; generic law or sociology positions without a clear criminology component are excluded.
+- **Dedup:** the same position appearing on more than one site is consolidated into a single row, with all source URLs listed.
+
+## Data files
+
+- `criminology_jobs.csv` — the master dataset (downloadable from the site too).
+- `data.js` — same data embedded for the in-browser dashboard, with consortium-member tags applied.
+
+## CrimRxiv Consortium
+
+Postings from [CrimRxiv Consortium](https://crimrxiv.com/consortium) member institutions are highlighted with an orange rail and "CrimRxiv" pill.
+
+## Local preview
+
+```bash
+python3 -m http.server 5000
+# then open http://localhost:5000
+```
+
+## Credits
+
+Built and maintained by [Scott Jacques](https://scottjacques.pubpub.org/) (Georgia State University / [CrimRxiv](https://crimrxiv.com)). Visual design mirrors the [Criminology PhD Faculty Explorer](https://crimconsortium.github.io/criminology-faculty-explorer).
