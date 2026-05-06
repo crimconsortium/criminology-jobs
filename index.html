@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Criminology Jobs Explorer</title>
-    <meta name="description" content="An interactive dashboard of current academic and practitioner job postings in criminology and criminal justice, aggregated from ASC, ACJS, jobs.ac.uk, and HigherEdJobs." />
+    <meta name="description" content="An interactive dashboard of current academic and practitioner job postings in criminology and criminal justice, aggregated from ACJS, ASC, HigherEdJobs, and jobs.ac.uk. Provided by the CrimRxiv Consortium." />
 
     <meta property="og:title" content="Criminology Jobs Explorer" />
     <meta property="og:description" content="An interactive dashboard of current criminology and criminal justice job postings." />
@@ -50,11 +50,15 @@
       </header>
 
       <section class="hero">
-        <div class="hero-eyebrow">Aggregated from ASC, ACJS, jobs.ac.uk, and HigherEdJobs · Last updated May 6, 2026</div>
+        <div class="hero-eyebrow">A jobs dashboard provided by <a href="https://crimrxiv.com/consortium" target="_blank" rel="noopener">CrimRxiv Consortium</a> · Last updated May 6, 2026</div>
         <h1 class="hero-title">Find the criminology post that fits <em>your next move</em>.</h1>
         <p class="hero-lead">
           Browse current academic and practitioner job postings in criminology, criminal justice, and closely related fields.
-          Search by title, institution, or keyword; filter by country, source, rank, or contract type; and jump straight to each posting.
+          Search by title, institution, or keyword; filter by country or rank; and jump straight to each posting.
+        </p>
+        <p class="hero-cta">
+          <a href="https://crimrxiv.com" target="_blank" rel="noopener">Visit CrimRxiv</a>
+          to browse open-access criminology research and make your own work freely available.
         </p>
       </section>
 
@@ -85,34 +89,12 @@
             <div class="dept-list" id="country-list"></div>
           </div>
 
-          <div class="panel panel-consortium">
-            <div class="panel-title">Affiliation</div>
-            <div class="panel-hint">
-              Highlight postings from <a href="https://crimrxiv.com/consortium" target="_blank" rel="noopener">CrimRxiv Consortium</a> member institutions.
-              <span id="consortium-summary"></span>
-            </div>
-            <label class="toggle-row">
-              <input type="checkbox" id="consortium-toggle" />
-              <span class="toggle-row-label">Show only consortium jobs</span>
-            </label>
-          </div>
-
           <div class="panel">
             <div class="panel-title">Filters</div>
 
             <div class="filter-group">
-              <label class="filter-label">Source site</label>
-              <div class="checkbox-list" id="source-filter"></div>
-            </div>
-
-            <div class="filter-group">
               <label class="filter-label">Rank / role type</label>
               <div class="checkbox-list" id="rank-filter"></div>
-            </div>
-
-            <div class="filter-group">
-              <label class="filter-label">Contract type</label>
-              <div class="checkbox-list" id="contract-filter"></div>
             </div>
 
             <button class="clear-btn" id="clear-filters">Clear all filters</button>
@@ -182,10 +164,10 @@
         <div class="coverage-items" id="coverage-items"></div>
 
         <div class="footer-note">
-          Aggregated May 6, 2026 from <a href="https://asc41.org/career-center/position-postings/" target="_blank" rel="noopener">ASC</a>,
-          <a href="https://careers.acjs.org/jobs/" target="_blank" rel="noopener">ACJS</a>,
-          <a href="https://www.jobs.ac.uk/search/?keywords=criminology&location=" target="_blank" rel="noopener">jobs.ac.uk</a>, and
-          <a href="https://www.higheredjobs.com/faculty/search.cfm?JobCat=156" target="_blank" rel="noopener">HigherEdJobs</a>.
+          Aggregated May 6, 2026 from <a href="https://careers.acjs.org/jobs/" target="_blank" rel="noopener">ACJS</a>,
+          <a href="https://asc41.org/career-center/position-postings/" target="_blank" rel="noopener">ASC</a>,
+          <a href="https://www.higheredjobs.com/faculty/search.cfm?JobCat=156" target="_blank" rel="noopener">HigherEdJobs</a>, and
+          <a href="https://www.jobs.ac.uk/search/?keywords=criminology&location=" target="_blank" rel="noopener">jobs.ac.uk</a>.
           Listings change frequently — verify each posting at its source before applying.
         </div>
       </footer>

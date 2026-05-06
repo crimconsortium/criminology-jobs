@@ -8,10 +8,10 @@ A searchable dashboard of current academic and practitioner job postings in crim
 
 Postings are aggregated from publicly visible listings only — anything behind a login is excluded.
 
-- [American Society of Criminology — Career Center](https://asc41.org/career-center/position-postings/)
 - [Academy of Criminal Justice Sciences — Careers](https://careers.acjs.org/jobs/)
-- [jobs.ac.uk — criminology search](https://www.jobs.ac.uk/search/?keywords=criminology)
+- [American Society of Criminology — Career Center](https://asc41.org/career-center/position-postings/)
 - [HigherEdJobs — Criminal Justice & Criminology faculty](https://www.higheredjobs.com/faculty/search.cfm?JobCat=156)
+- [jobs.ac.uk — criminology search](https://www.jobs.ac.uk/search/?keywords=criminology)
 
 ## Coverage
 

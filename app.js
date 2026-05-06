@@ -11,14 +11,26 @@
   var state = {
     search: "",
     country: null, // single-select
-    sources: new Set(),
     ranks: new Set(),
-    contracts: new Set(),
     sort: "posted_desc",
     consortiumOnly: false,
   };
 
   function isConsortium(job) { return !!(job && job.consortium_member); }
+
+  // Bucket the 27 distinct rank_type values into ~7 useful groups.
+  function bucketRank(r) {
+    if (!r) return "Other";
+    var s = String(r).toLowerCase();
+    if (/tenure|^assistant prof|^assistant\/|^associate prof|open rank|assistant teaching/.test(s)) return "Tenure-track";
+    if (/postdoc|research fellow/.test(s)) return "Postdoc / Research";
+    if (/visiting/.test(s)) return "Visiting";
+    if (/lecturer|university teacher|^tutor$|instructional/.test(s)) return "Lecturer / Teaching";
+    if (/adjunct|part-time|affiliated/.test(s)) return "Adjunct / Part-time";
+    if (/clinical/.test(s)) return "Clinical";
+    if (/practitioner|academic specialist/.test(s)) return "Practitioner";
+    return "Other";
+  }
 
   // ============================================================
   // Date helpers
@@ -85,14 +97,6 @@
   // ============================================================
   // Filtering + sorting
   // ============================================================
-  function jobMatchesSources(job) {
-    if (state.sources.size === 0) return true;
-    var sources = (job.source_site || "").split(",").map(function (s) { return s.trim(); });
-    for (var i = 0; i < sources.length; i++) {
-      if (state.sources.has(sources[i])) return true;
-    }
-    return false;
-  }
   function jobMatchesSearch(job) {
     if (!state.search) return true;
     var q = state.search.toLowerCase();
@@ -111,9 +115,7 @@
     return JOBS.filter(function (j) {
       if (state.consortiumOnly && !isConsortium(j)) return false;
       if (state.country && j.country !== state.country) return false;
-      if (!jobMatchesSources(j)) return false;
-      if (state.ranks.size > 0 && !state.ranks.has(j.rank_type)) return false;
-      if (state.contracts.size > 0 && !state.contracts.has(j.contract_type)) return false;
+      if (state.ranks.size > 0 && !state.ranks.has(bucketRank(j.rank_type))) return false;
       if (!jobMatchesSearch(j)) return false;
       return true;
     });
@@ -212,14 +214,6 @@
     $("#stat-filtered").textContent = filtered.length;
     var consortiumCount = JOBS.filter(isConsortium).length;
     $("#stat-consortium").textContent = consortiumCount;
-    var summary = $("#consortium-summary");
-    if (summary) {
-      if (consortiumCount === 0) {
-        summary.textContent = "No consortium-member postings in the current snapshot.";
-      } else {
-        summary.textContent = consortiumCount + " of " + JOBS.length + " postings are from consortium-member institutions.";
-      }
-    }
   }
 
   // ============================================================
@@ -251,28 +245,35 @@
   }
 
   // ============================================================
-  // Render: checkbox filter groups
+  // Render: rank-bucket checkbox group
   // ============================================================
-  function renderCheckboxGroup(containerId, key, valueSet, sortByCount) {
-    var counts = countBy(JOBS, key);
-    var entries = Object.keys(counts);
-    if (sortByCount) {
-      entries.sort(function (a, b) {
-        var diff = counts[b] - counts[a];
-        return diff !== 0 ? diff : a.localeCompare(b);
-      });
-    } else {
-      entries.sort(function (a, b) { return a.localeCompare(b); });
-    }
-    var container = $("#" + containerId);
+  // Preferred display order for rank buckets.
+  var RANK_BUCKET_ORDER = [
+    "Tenure-track",
+    "Postdoc / Research",
+    "Lecturer / Teaching",
+    "Visiting",
+    "Clinical",
+    "Adjunct / Part-time",
+    "Practitioner",
+    "Other",
+  ];
+  function renderRankFilter() {
+    var counts = {};
+    JOBS.forEach(function (j) {
+      var b = bucketRank(j.rank_type);
+      counts[b] = (counts[b] || 0) + 1;
+    });
+    var entries = RANK_BUCKET_ORDER.filter(function (b) { return counts[b]; });
+    var container = $("#rank-filter");
     container.innerHTML = "";
     entries.forEach(function (v) {
-      var checked = valueSet.has(v);
+      var checked = state.ranks.has(v);
       var label = el("label", { class: "checkbox-item" }, []);
       var cb = el("input", { type: "checkbox" });
       cb.checked = checked;
       cb.addEventListener("change", function () {
-        if (cb.checked) valueSet.add(v); else valueSet.delete(v);
+        if (cb.checked) state.ranks.add(v); else state.ranks.delete(v);
         render();
       });
       label.appendChild(cb);
@@ -300,22 +301,14 @@
       bar.appendChild(chip);
     }
     if (state.search) addChip('Search: "' + state.search + '"', function () { state.search = ""; $("#search-input").value = ""; render(); });
-    if (state.consortiumOnly) addChip("CrimRxiv Consortium only", function () { state.consortiumOnly = false; $("#consortium-toggle").checked = false; render(); });
     if (state.country) addChip("Country: " + state.country, function () { state.country = null; render(); });
-    state.sources.forEach(function (v) { addChip("Source: " + v, function () { state.sources.delete(v); render(); }); });
     state.ranks.forEach(function (v) { addChip("Rank: " + v, function () { state.ranks.delete(v); render(); }); });
-    state.contracts.forEach(function (v) { addChip("Contract: " + v, function () { state.contracts.delete(v); render(); }); });
   }
 
   // ============================================================
   // Render: cards
   // ============================================================
   function jobCard(job) {
-    var sources = (job.source_site || "").split(",").map(function (s) { return s.trim(); });
-    var sourceBadges = sources.map(function (s) {
-      return '<span class="source-badge ' + sourceClass(s) + '">' + escapeHtml(s) + '</span>';
-    }).join(" ");
-
     var locParts = [];
     if (job.city_or_region) locParts.push(job.city_or_region);
     if (job.country) locParts.push(job.country);
@@ -325,7 +318,7 @@
     var deadlinePretty = prettyDate(job.deadline_or_review_date) || job.deadline_or_review_date || "";
 
     var tags = [];
-    if (job.rank_type) tags.push('<span class="tag tag-rank">' + escapeHtml(job.rank_type) + "</span>");
+    if (job.rank_type) tags.push('<span class="tag tag-rank">' + escapeHtml(bucketRank(job.rank_type)) + "</span>");
     if (job.contract_type) tags.push('<span class="tag">' + escapeHtml(job.contract_type) + "</span>");
 
     var consortiumBadge = "";
@@ -354,10 +347,13 @@
       type: "button",
       "data-id": job.id,
     });
+    var eyebrowParts = [];
+    if (consortiumBadge) eyebrowParts.push(consortiumBadge);
+    if (job.posted_date) eyebrowParts.push('<span>posted ' + escapeHtml(prettyDate(job.posted_date)) + "</span>");
+    var eyebrowHtml = eyebrowParts.length ? ('<div class="job-card-eyebrow">' + eyebrowParts.join(" ") + "</div>") : "";
+
     card.innerHTML =
-      '<div class="job-card-eyebrow">' + sourceBadges + consortiumBadge +
-      (job.posted_date ? ' <span>posted ' + escapeHtml(prettyDate(job.posted_date)) + "</span>" : "") +
-      "</div>" +
+      eyebrowHtml +
       '<div class="job-card-title">' + escapeHtml(job.job_title || "—") + "</div>" +
       '<div class="job-card-inst">' + escapeHtml(job.institution || "") + "</div>" +
       (locStr ? '<div class="job-card-meta"><span class="job-card-meta-item">' +
@@ -507,9 +503,7 @@
   // ============================================================
   function render() {
     renderCountries();
-    renderCheckboxGroup("source-filter", "source_site", state.sources, true);
-    renderCheckboxGroup("rank-filter", "rank_type", state.ranks, true);
-    renderCheckboxGroup("contract-filter", "contract_type", state.contracts, true);
+    renderRankFilter();
     renderActiveFilters();
     renderResults();
   }
@@ -544,19 +538,10 @@
     $("#clear-filters").addEventListener("click", function () {
       state.search = "";
       state.country = null;
-      state.sources.clear();
       state.ranks.clear();
-      state.contracts.clear();
       state.consortiumOnly = false;
-      $("#consortium-toggle").checked = false;
       $("#search-input").value = "";
       $("#search-clear").classList.remove("visible");
-      render();
-    });
-
-    // Consortium toggle
-    $("#consortium-toggle").addEventListener("change", function (e) {
-      state.consortiumOnly = e.target.checked;
       render();
     });
 
