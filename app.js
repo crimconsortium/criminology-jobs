@@ -73,13 +73,23 @@
   function bucketRank(r) {
     if (!r) return "Other";
     var s = String(r).toLowerCase();
-    if (/tenure|^assistant prof|^assistant\/|^associate prof|open rank|assistant teaching/.test(s)) return "Tenure-track";
+    // Academic buckets first (so "Senior Lecturer" doesn't get caught by industry "Senior")
+    if (/tenure|^assistant prof|^assistant\/|^associate prof|open rank|assistant teaching|full prof/.test(s)) return "Tenure-track";
     if (/postdoc|research fellow/.test(s)) return "Postdoc / Research";
     if (/visiting/.test(s)) return "Visiting";
     if (/lecturer|university teacher|^tutor$|instructional/.test(s)) return "Lecturer / Teaching";
     if (/adjunct|part-time|affiliated/.test(s)) return "Adjunct / Part-time";
     if (/clinical/.test(s)) return "Clinical";
     if (/practitioner|academic specialist/.test(s)) return "Practitioner";
+    // Industry buckets (TSPA and similar)
+    if (/director|head of|\bvp\b|chief|vice president/.test(s)) return "Director / VP";
+    if (/manager/.test(s)) return "Manager";
+    if (/engineer|architect|data scientist|machine learning|developer/.test(s)) return "Engineer / Technical";
+    if (/analyst/.test(s)) return "Analyst";
+    if (/\blead\b/.test(s)) return "Lead";
+    if (/specialist|counsel|investigator|^agent$/.test(s)) return "Specialist";
+    if (/associate/.test(s)) return "Associate";
+    if (/^senior$/.test(s)) return "Engineer / Technical";
     return "Other";
   }
 
@@ -308,6 +318,13 @@
     "Clinical",
     "Adjunct / Part-time",
     "Practitioner",
+    "Director / VP",
+    "Manager",
+    "Engineer / Technical",
+    "Analyst",
+    "Lead",
+    "Specialist",
+    "Associate",
     "Other",
   ];
   function renderRankFilter() {
@@ -521,10 +538,11 @@
   function renderCoverage() {
     var html =
       '<ul>' +
-      '<li><strong>ASC (asc41.org)</strong> — single static page, no pagination. All 6 publicly listed postings captured. Two had deadlines that may have just lapsed (UNC Charlotte April 7; Illinois April 27) but were still listed at capture time.</li>' +
       '<li><strong>ACJS (careers.acjs.org)</strong> — both public pages of the careers board collected (39 listings total). 19 retained as criminology / criminal-justice relevant; 20 excluded as generic law-firm paralegal/clerk roles, EMTs, unrelated political organizers, and tech-company community-coordinator postings. Posted dates were given as relative ("X days ago") and converted to absolute dates relative to April 26, 2026.</li>' +
-      '<li><strong>jobs.ac.uk</strong> — the keyword=criminology search returned 15 results on a single page; 7 retained as clearly criminology-relevant (including criminology-adjacent sociology and law/social-justice posts where criminology is an explicit qualifying field). 8 excluded as pure law-school lectureships, generic LSE methodology fellowships, or unrelated technician/editor roles.</li>' +
+      '<li><strong>ASC (asc41.org)</strong> — single static page, no pagination. All 6 publicly listed postings captured. Two had deadlines that may have just lapsed (UNC Charlotte April 7; Illinois April 27) but were still listed at capture time.</li>' +
       '<li><strong>HigherEdJobs (higheredjobs.com)</strong> — Criminal Justice & Criminology faculty category, first 100 active postings captured (May 6, 2026). 25 retained as faculty + research roles (assistant/associate/full professors, lecturers, research professors, clinical faculty, department chairs); 75 excluded as adjunct, part-time, instructor pools, dual-credit, police-academy training, or non-criminology forensic-science/homeland-security postings. Two University of Idaho clinical-faculty posts cross-listed with ASC are merged into single rows.</li>' +
+      '<li><strong>jobs.ac.uk</strong> — the keyword=criminology search returned 15 results on a single page; 7 retained as clearly criminology-relevant (including criminology-adjacent sociology and law/social-justice posts where criminology is an explicit qualifying field). 8 excluded as pure law-school lectureships, generic LSE methodology fellowships, or unrelated technician/editor roles.</li>' +
+      '<li><strong>TSPA (tspa.org)</strong> — the public Trust &amp; Safety job board indexed on May 12, 2026. All 113 publicly listed postings included as-is — TSPA covers industry trust-and-safety, policy, and content-moderation roles at tech companies (e.g. Google, Discord, Meta, TikTok). No filtering applied: roles span analyst, specialist, manager, lead, engineer, and director levels. Posted dates and deadlines are not exposed on the source listing, so those columns are blank for every TSPA row.</li>' +
       '<li><strong>Detail-page enrichment</strong> — teaching and research expectations are typically only described inside the linked PDFs / detail pages, so those columns are blank for almost every row. A second pass that visits each ad would be required to populate them.</li>' +
       '<li><strong>De-duplication</strong> — records are matched across sources by normalized institution + normalized title; matches are merged into a single row with a comma-separated source_site (e.g. "ASC, HigherEdJobs") and all source URLs concatenated in combined_urls. The current snapshot has 2 cross-site duplicates: both University of Idaho clinical-faculty postings (PEI and non-PEI) appear on ASC and HigherEdJobs.</li>' +
       "</ul>";

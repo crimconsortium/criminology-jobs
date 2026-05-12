@@ -1,6 +1,6 @@
 # Criminology Jobs Explorer
 
-A searchable dashboard of current academic and practitioner job postings in criminology, criminal justice, and closely related fields.
+A searchable dashboard of current academic, practitioner, and trust & safety job postings in criminology, criminal justice, and closely related fields.
 
 **Live site:** https://crimconsortium.github.io/criminology-jobs
 
@@ -12,6 +12,7 @@ Postings are aggregated from publicly visible listings only — anything behind 
 - [American Society of Criminology — Career Center](https://asc41.org/career-center/position-postings/)
 - [HigherEdJobs — Criminal Justice & Criminology faculty](https://www.higheredjobs.com/faculty/search.cfm?JobCat=156)
 - [jobs.ac.uk — criminology search](https://www.jobs.ac.uk/search/?keywords=criminology)
+- [Trust & Safety Professional Association — Job Board](https://www.tspa.org/explore/job-board/)
 
 ## Coverage
 
