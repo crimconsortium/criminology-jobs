@@ -63,11 +63,36 @@
     search: "",
     country: null, // single-select
     ranks: new Set(),
+    tracks: new Set(), // "Academic" | "Applied"
     sort: "posted_desc",
     consortiumOnly: false,
   };
 
   function isConsortium(job) { return !!(job && job.consortium_member); }
+
+  // ============================================================
+  // Derive Academic vs Applied track from source_site + rank bucket.
+  //
+  // Default: source decides. ACJS / ASC / HigherEdJobs / jobs.ac.uk =>
+  // Academic; TSPA => Applied.
+  //
+  // Override: any row whose rank bucket is "Practitioner" is reclassified
+  // as Applied even if its source is an academic board. This catches the
+  // applied-track postings that show up on ACJS (agency analysts, police
+  // researchers, NGO program leads, etc.) without requiring per-row
+  // hand-classification.
+  // ============================================================
+  var APPLIED_SOURCES = { "TSPA": true };
+  function deriveTrack(job) {
+    if (!job) return "Academic";
+    if (bucketRank(job.rank_type) === "Practitioner") return "Applied";
+    var sources = String(job.source_site || "").split(",").map(function (s) { return s.trim(); });
+    for (var i = 0; i < sources.length; i++) {
+      if (APPLIED_SOURCES[sources[i]]) return "Applied";
+    }
+    return "Academic";
+  }
+  var TRACK_ORDER = ["Academic", "Applied"];
 
   // Bucket the 27 distinct rank_type values into ~7 useful groups.
   function bucketRank(r) {
@@ -178,6 +203,7 @@
       if (state.consortiumOnly && !isConsortium(j)) return false;
       if (state.country && j.display_country !== state.country) return false;
       if (state.ranks.size > 0 && !state.ranks.has(bucketRank(j.rank_type))) return false;
+      if (state.tracks.size > 0 && !state.tracks.has(deriveTrack(j))) return false;
       if (!jobMatchesSearch(j)) return false;
       return true;
     });
@@ -327,6 +353,32 @@
     "Associate",
     "Other",
   ];
+  // ============================================================
+  // Render: track (Academic vs Applied) checkbox group
+  // ============================================================
+  function renderTrackFilter() {
+    var counts = { Academic: 0, Applied: 0 };
+    JOBS.forEach(function (j) { counts[deriveTrack(j)]++; });
+    var container = $("#track-filter");
+    if (!container) return;
+    container.innerHTML = "";
+    TRACK_ORDER.forEach(function (v) {
+      if (!counts[v]) return;
+      var checked = state.tracks.has(v);
+      var label = el("label", { class: "checkbox-item" }, []);
+      var cb = el("input", { type: "checkbox" });
+      cb.checked = checked;
+      cb.addEventListener("change", function () {
+        if (cb.checked) state.tracks.add(v); else state.tracks.delete(v);
+        render();
+      });
+      label.appendChild(cb);
+      label.appendChild(el("span", { class: "checkbox-item-label", text: v }));
+      label.appendChild(el("span", { class: "checkbox-item-count", text: String(counts[v]) }));
+      container.appendChild(label);
+    });
+  }
+
   function renderRankFilter() {
     var counts = {};
     JOBS.forEach(function (j) {
@@ -376,6 +428,7 @@
       render();
     });
     if (state.country) addChip("Country: " + state.country, function () { state.country = null; render(); });
+    state.tracks.forEach(function (v) { addChip("Track: " + v, function () { state.tracks.delete(v); render(); }); });
     state.ranks.forEach(function (v) { addChip("Rank: " + v, function () { state.ranks.delete(v); render(); }); });
   }
 
@@ -554,6 +607,7 @@
   // ============================================================
   function render() {
     renderCountries();
+    renderTrackFilter();
     renderRankFilter();
     renderActiveFilters();
     renderResults();
@@ -590,6 +644,7 @@
       state.search = "";
       state.country = null;
       state.ranks.clear();
+      state.tracks.clear();
       state.consortiumOnly = false;
       var ct = $("#consortium-toggle"); if (ct) ct.checked = false;
       $("#search-input").value = "";
