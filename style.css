@@ -201,10 +201,19 @@ a:hover { border-bottom-color: var(--color-primary); }
   gap: var(--space-3);
 }
 
+.brand-link {
+  display: inline-flex;
+  line-height: 0;
+  text-decoration: none;
+}
+.brand-link:hover .brand-mark { opacity: 0.85; }
 .brand-mark {
   width: 36px;
   height: 36px;
   color: var(--color-primary);
+  display: block;
+  object-fit: contain;
+  flex-shrink: 0;
 }
 
 .brand-text {
