@@ -313,6 +313,12 @@ a:hover { border-bottom-color: var(--color-primary); }
   font-size: var(--text-base);
   line-height: 1.5;
 }
+.hero-cta p {
+  margin: 0;
+}
+.hero-cta p + p {
+  margin-top: var(--space-2);
+}
 .hero-cta a {
   color: var(--color-primary);
   font-weight: 600;
