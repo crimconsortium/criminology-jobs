@@ -422,7 +422,7 @@
       bar.appendChild(chip);
     }
     if (state.search) addChip('Search: "' + state.search + '"', function () { state.search = ""; $("#search-input").value = ""; render(); });
-    if (state.consortiumOnly) addChip("CrimRxiv Consortium only", function () {
+    if (state.consortiumOnly) addChip("CrimConsortium only", function () {
       state.consortiumOnly = false;
       var t = $("#consortium-toggle"); if (t) t.checked = false;
       render();
@@ -447,8 +447,8 @@
     var consortiumBadge = "";
     if (isConsortium(job)) {
       consortiumBadge =
-        ' <span class="consortium-badge" title="' + escapeHtml(job.consortium_member) + ' is a CrimRxiv Consortium member">' +
-        "CrimRxiv" +
+        ' <span class="consortium-badge" title="' + escapeHtml(job.consortium_member) + ' is a CrimConsortium member">' +
+        "CONSORTIUM" +
         "</span>";
     }
 
@@ -528,7 +528,7 @@
     if (salary && job.salary_currency) salary = job.salary_currency + " · " + salary;
 
     var consortiumValue = job.consortium_member
-      ? '<a href="https://crimrxiv.com/consortium" target="_blank" rel="noopener">' + escapeHtml(job.consortium_member) + ' — CrimRxiv Consortium member</a>'
+      ? '<a href="https://crimconsortium.com" target="_blank" rel="noopener">' + escapeHtml(job.consortium_member) + ' — CrimConsortium member</a>'
       : null;
 
     var fields =

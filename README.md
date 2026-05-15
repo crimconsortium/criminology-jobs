@@ -25,9 +25,9 @@ Postings are aggregated from publicly visible listings only — anything behind 
 - `criminology_jobs.csv` — the master dataset (downloadable from the site too).
 - `data.js` — same data embedded for the in-browser dashboard, with consortium-member tags applied.
 
-## CrimRxiv Consortium
+## CrimConsortium
 
-Postings from [CrimRxiv Consortium](https://crimrxiv.com/consortium) member institutions are highlighted with an orange rail and "CrimRxiv" pill.
+Postings from [CrimConsortium](https://crimconsortium.com) member institutions are highlighted with an orange rail and "Consortium" pill.
 
 ## Local preview
 

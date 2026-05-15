@@ -3531,5 +3531,5 @@ window.JOBS_DATA = {
       "consortium_member": ""
     }
   ],
-  "consortium_url": "https://crimrxiv.com/consortium"
+  "consortium_url": "https://crimconsortium.com"
 };
